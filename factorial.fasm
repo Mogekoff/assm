@@ -1,0 +1,68 @@
+format PE console						; формат создаваемого файла - консольный экзешник
+
+entry start								; точка входа в программу (метка)
+
+include 'win32a.inc'
+
+section '.data' data readable writable	; секция с данными
+
+        wstring db 'Hello. This program calculates factorial of number. Enter number: ', 0
+        errstring db 'You have input the number that less than 0. Incorrect input.', 0
+        formstrd db '%d', 0				; формат данных для ф-ии printf
+        number dd ?						; число под факториалом
+
+        NULL = 0						; константа ноль
+
+section '.code' code readable writable	; секция с кодом
+
+        factorial:						; зацикленная метка для вычисления факториала
+                cmp [number], 1			; если число стало равно единице
+                je ok					; переходим на метку ok, где происходит вывод аккумулируемого результата из регистра eax
+                sub [number], 1			; иначе, уменьшаем число на единицу
+                mul [number]			; домножаем это число на результат в eax
+                jmp factorial			; зацикливаемся
+
+        start:
+                push wstring			; в стек как 1-й параметр отправляем приветственную строку
+                call [printf]			; вызов ф-ии printf, которая из стека возьмет ранее переданную строку
+
+                push number				; передаем ф-ии scanf адрес ячейки, в которую хотим считать число 2-м параметром
+                push formstrd			; передаем формат считываемого значения - число, 1-м параметром
+                call [scanf]			; вызываем scanf
+
+                mov eax, [number]		; передаем в eax число из number
+
+                cmp eax, 0				; сравниваем полученное число с 0
+                je forzero				; если равно нулю, переходим на метку forzero
+                jl lesszero				; если меньше нуля, переходим на метку lesszero
+                jmp factorial			; иначе: переходим на метку factorial и вычисляем его
+
+        forzero:
+                mov eax, 1				; записываем в eax единицу и проваливаемся ниже в метку ok
+        ok:
+                push eax				; передаем в стек 2-м параметром результат в eax
+                push formstrd			; формат - число
+                call [printf]			; выводим результат через printf
+                jmp exit 				; переходим на метку завершения работы программы
+        lesszero:
+                push errstring 			; выводим строку с ошибкой и выходим
+                call [printf]			;
+                jmp exit 				;
+        exit:
+                call [getch] 			; вызываем getch для ожидания нажатия любой клавиши
+                push NULL				; в стек отправляем 0 - результат завершения программы
+                call [ExitProcess]
+
+
+section '.idata' import data readable	; секция с таблицей импорта
+
+        library kernel, 'kernel32.dll',\	; подключаем библиотеки kernel32.dll и msvcrt.dll и даем им псевдонимы kernel и msvcrt соотвественно
+                msvcrt, 'msvcrt.dll'		;
+
+        import kernel,\						; из кернел импортируем ф-ю ExitProcess и даем ей псевдоним ExitProcess
+               ExitProcess, 'ExitProcess'
+
+        import msvcrt,\						; аналогичный импорт ф-ий из библиотеки msvcrt, Си-шные ф-ии.
+               printf, 'printf',\
+               getch, '_getch',\
+               scanf, 'scanf'
