@@ -1,0 +1,131 @@
+format PE console						; формат создаваемого файла - консольный экзешник
+
+entry start								; точка входа в программу (метка)
+
+include 'C:\Users\mogek\Documents\fasm\INCLUDE\win32a.inc'
+
+section '.data' data readable writable	; секция с данными
+
+        wstring db 'Welcome to calculator. ', 0
+        erstring db 'Error input', 0
+        opstring db 'Enter one of operations (+,-,*,/):', 0
+        zrdivstring db 10, 'Error zero division', 0
+        fstring db 'Enter first number: ', 0
+        sstring db 'Enter second number: ', 0
+        rstring db 10, 'Result: %d', 0
+        pstring dd ',', 0
+        scanchar db '%c', 0				; формат данных для ф-ии printf
+        scannum db '%d', 0
+        a dd ?						; число 1
+        b dd ?						; число 2
+        c dd ?                                          ; остаток от деления
+        op dd ?                                         ; операция, символ
+        NULL = 0						; константа ноль
+
+section '.code' code readable writable	; секция с кодом
+        
+        _add:
+                mov ecx, [a]
+                add ecx, [b]
+                jmp finish
+        _sub:
+                mov ecx, [a]
+                sub ecx, [b]
+                jmp finish
+                
+        _mul:
+                mov ecx, [a]
+                imul ecx, [b]
+                jmp finish
+        _div:                
+                cmp [b], 0
+                je zerodiv
+
+                mov eax, [a]
+                mov ecx, [b]
+                mov edx, 0
+                div ecx
+                mov [c], edx    ; сохраняем остаток от деления
+                push eax
+                push rstring
+                call [printf]
+                push pstring
+                call [printf]
+
+                mov ebx, 0
+                lp:                     ; цикл от 0 до 3 для вычисления остатка
+                        mov eax, [c]    ;вносим остаток от деления
+                        mov ecx, [b]    ;вносим делитель
+                        imul eax, 10    ;дописываем 0 к остатку как при делении столбиком
+                        mov edx, 0      ;очищаем регистр для остатка
+                        div ecx
+                        mov [c], edx    ;записываем новый остаток
+                        push eax
+                        push scannum
+                        call [printf]
+
+                        add ebx, 1
+                        cmp ebx, 3
+                jne lp
+                jmp exit
+
+        zerodiv:
+                push zrdivstring
+                call [printf]
+                jmp exit
+
+        start:
+                push wstring
+                call [printf]
+
+                push fstring
+                call [printf]
+                push a
+                push scannum
+                call [scanf]
+
+                push sstring
+                call [printf]
+                push b
+                push scannum
+                call [scanf]
+
+                push opstring
+                call [printf]
+                call [getch]    ;считали символ в eax
+
+                cmp eax, 43 ;сравнили с аскии кодом плюса +
+                je _add
+                cmp eax, 45 ;сравнили с аскии кодом минуса -
+                je _sub
+                cmp eax, 42 ;сравнили с аскии кодом умножение *
+                je _mul
+                cmp eax, 47 ;сравнили с аскии кодом деления /
+                je _div
+
+                push erstring
+                call [printf]
+                jmp exit
+
+	finish:
+                push ecx
+                push rstring
+                call [printf]	
+        exit:
+                call [getch] 			; вызываем getch для ожидания нажатия любой клавиши
+                push NULL				; в стек отправляем 0 - результат завершения программы
+                call [ExitProcess]
+
+
+section '.idata' import data readable	; секция с таблицей импорта
+
+        library kernel, 'kernel32.dll',\	; подключаем библиотеки kernel32.dll и msvcrt.dll и даем им псевдонимы kernel и msvcrt соотвественно
+                msvcrt, 'msvcrt.dll'		;
+
+        import kernel,\						; из кернел импортируем ф-ю ExitProcess и даем ей псевдоним ExitProcess
+               ExitProcess, 'ExitProcess'
+
+        import msvcrt,\						; аналогичный импорт ф-ий из библиотеки msvcrt, Си-шные ф-ии.
+               printf, 'printf',\
+               getch, '_getch',\
+               scanf, 'scanf'
